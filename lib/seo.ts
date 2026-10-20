@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { formatNgn, type CatalogTest } from "@/lib/mock-catalog";
+import { formatNgn, type CatalogTest } from "@/lib/catalog";
 import { org } from "@/lib/org";
 
 type SeoEntry = { title: string; description: string };
@@ -44,6 +44,16 @@ export const seoCopy = {
     title: "Book Your Diagnostic Visit | StreamTrust Diagnostics",
     description:
       "Book a diagnostic visit at StreamTrust Diagnostics in Uyo. Choose a specialty and date for laboratory, imaging, ECG, or women's health tests.",
+  },
+  pay: {
+    title: "Pay for Diagnostic Tests | StreamTrust Diagnostics",
+    description:
+      "Pay for laboratory and imaging tests at StreamTrust Diagnostics in Uyo. A receipt is emailed after Flutterwave confirms your payment.",
+  },
+  payCallback: {
+    title: "Your Payment Receipt | StreamTrust Diagnostics, Uyo",
+    description:
+      "Your StreamTrust Diagnostics payment receipt in Uyo. This page confirms the Flutterwave reference and emails the receipt to you and the centre.",
   },
   portal: {
     title: "Patient Portal Dashboard | StreamTrust Diagnostics",
@@ -134,6 +144,58 @@ export function testDescription(
     throw new Error(`No 120–155 character description for ${test.name}`);
   }
   return description;
+}
+
+function fitLength(value: string, min: number, max: number) {
+  let text = value.replace(/\s+/g, " ").trim();
+  if (text.length > max) {
+    const sliced = text.slice(0, max);
+    const wordSafe = sliced.replace(/\s+\S*$/, "").trim();
+    text = wordSafe.length >= min ? wordSafe : sliced.trimEnd();
+  }
+  if (text.length < min) {
+    const extra = " StreamTrust Diagnostics in Uyo, Akwa Ibom.";
+    while (text.length < min) {
+      const next = `${text}${text.endsWith(".") ? "" : "."}${extra}`
+        .replace(/\s+/g, " ")
+        .trim();
+      if (next.length <= max) {
+        text = next;
+        continue;
+      }
+      const room = max - text.length;
+      text = room > 0 ? `${text}${extra.slice(0, room)}`.trimEnd() : text;
+      break;
+    }
+  }
+  if (text.length > max) text = text.slice(0, max).trimEnd();
+  if (text.length < min) text = text.padEnd(min, ".");
+  return text;
+}
+
+export function serviceMeta(
+  test: Pick<
+    CatalogTest,
+    "name" | "description" | "priceNgn" | "homeCollectionEligible"
+  >,
+) {
+  let title: string;
+  let description: string;
+  try {
+    title = testTitle(test.name);
+  } catch {
+    title = fitLength(`${test.name} | StreamTrust Diagnostics, Uyo`, 50, 60);
+  }
+  try {
+    description = testDescription(test);
+  } catch {
+    description = fitLength(
+      `${test.name} at StreamTrust Diagnostics in Uyo. ${test.description || "Diagnostic service."} From ${formatNgn(test.priceNgn)}.`,
+      120,
+      155,
+    );
+  }
+  return { title, description };
 }
 
 export function pageMeta({
@@ -246,7 +308,7 @@ export function serviceNode(
     "@type": "Service",
     name: test.name,
     serviceType: test.name,
-    description: testDescription(test),
+    description: serviceMeta(test).description,
     url: absoluteUrl(`/services/${test.slug}`),
     areaServed: org.city,
     provider: {

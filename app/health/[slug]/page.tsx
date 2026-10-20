@@ -10,8 +10,8 @@ import {
   healthDisclaimer,
   healthTopics,
 } from "@/lib/health-topics";
-import { getTestBySlug } from "@/lib/mock-catalog";
 import { breadcrumbNode, pageMeta } from "@/lib/seo";
+import { getServices } from "@/lib/vessel";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -40,9 +40,7 @@ export default async function HealthTopicPage({ params }: Props) {
   if (!topic) notFound();
 
   const photos = photosForTopicPrefix(topic.imagePrefix);
-  const related = topic.relatedServiceSlugs
-    .map((serviceSlug) => getTestBySlug(serviceSlug))
-    .filter((test) => test !== undefined);
+  const related = await relatedServices(topic.relatedServiceSlugs);
   const others = healthTopics.filter((item) => item.slug !== topic.slug);
 
   return (
@@ -107,9 +105,9 @@ export default async function HealthTopicPage({ params }: Props) {
               </h2>
               <ul className="mt-4 space-y-3">
                 {related.map((test) => (
-                  <li key={test.slug}>
+                  <li key={test.id}>
                     <Link
-                      href={`/services/${test.slug}`}
+                      href={`/services/${test.id}`}
                       className="font-medium text-teal hover:underline"
                     >
                       {test.name}
@@ -144,4 +142,26 @@ export default async function HealthTopicPage({ params }: Props) {
       </Section>
     </>
   );
+}
+
+async function relatedServices(slugs: string[]) {
+  const related = [];
+  const seen = new Set<string>();
+
+  for (const slug of slugs) {
+    const search = slug.replace(/-/g, " ");
+    const { services } = await getServices({ search, skip: 0, take: 10 });
+    const needle = search.toLowerCase();
+    const lastWord = needle.split(" ").at(-1) ?? needle;
+    const match =
+      services.find((service) => service.name.toLowerCase() === needle) ??
+      services.find((service) => service.name.toLowerCase().includes(lastWord)) ??
+      services[0];
+    if (match && !seen.has(match.id)) {
+      seen.add(match.id);
+      related.push(match);
+    }
+  }
+
+  return related;
 }

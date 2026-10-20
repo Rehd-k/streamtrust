@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import { HomeCollectionWizard } from "@/components/HomeCollectionWizard";
 import { JsonLd } from "@/components/JsonLd";
 import { PageHero, Section } from "@/components/ui";
+import { servicesForHomeCollection } from "@/lib/catalog";
 import { breadcrumbNode, pageMeta, seoCopy } from "@/lib/seo";
+import { getAllServices } from "@/lib/vessel";
 
 export const metadata = pageMeta({
   title: seoCopy.homeCollection.title,
@@ -10,7 +12,12 @@ export const metadata = pageMeta({
   path: "/home-collection",
 });
 
-export default function HomeCollectionPage() {
+export const dynamic = "force-dynamic";
+
+export default async function HomeCollectionPage() {
+  const { services, error } = await getAllServices();
+  const eligible = servicesForHomeCollection(services);
+
   return (
     <>
       <JsonLd
@@ -28,7 +35,7 @@ export default function HomeCollectionPage() {
       />
       <Section>
         <Suspense fallback={<p className="text-muted">Loading…</p>}>
-          <HomeCollectionWizard />
+          <HomeCollectionWizard services={eligible} loadError={error} />
         </Suspense>
       </Section>
     </>

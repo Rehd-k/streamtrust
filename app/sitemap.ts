@@ -1,11 +1,12 @@
 import type { MetadataRoute } from "next";
 import { healthTopics } from "@/lib/health-topics";
-import { tests } from "@/lib/mock-catalog";
 import { org } from "@/lib/org";
+import { getAllServices } from "@/lib/vessel";
 
 const lastModified = new Date("2026-10-03");
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const { services } = await getAllServices();
   const staticRoutes = [
     "",
     "/about",
@@ -22,8 +23,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: path ? `${org.website}${path}` : org.website,
       lastModified,
     })),
-    ...tests.map((test) => ({
-      url: `${org.website}/services/${test.slug}`,
+    ...services.map((test) => ({
+      url: `${org.website}/services/${test.id}`,
       lastModified,
     })),
     ...healthTopics.map((topic) => ({

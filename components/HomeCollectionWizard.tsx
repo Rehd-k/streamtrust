@@ -1,16 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import {
-  formatNgn,
-  getHomeCollectionTests,
-  getTestBySlug,
-  type CatalogTest,
-} from "@/lib/mock-catalog";
+import { formatNgn, type CatalogTest } from "@/lib/catalog";
 
-type Step = "tests" | "details" | "review" | "done";
+type Step = "tests" | "details" | "review";
 
 type FormState = {
   fullName: string;
@@ -30,22 +24,28 @@ const emptyForm: FormState = {
   notes: "",
 };
 
-export function HomeCollectionWizard() {
+export function HomeCollectionWizard({
+  services,
+  loadError,
+}: {
+  services: CatalogTest[];
+  loadError?: string | null;
+}) {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const eligible = getHomeCollectionTests();
+  const eligible = services;
   const preset = searchParams.get("test");
 
   const initialSelected = useMemo(() => {
     if (!preset) return new Set<string>();
-    const t = getTestBySlug(preset);
-    return t?.homeCollectionEligible ? new Set([t.id]) : new Set<string>();
-  }, [preset]);
+    const match = eligible.find(
+      (service) => service.id === preset || service.slug === preset,
+    );
+    return match ? new Set([match.id]) : new Set<string>();
+  }, [eligible, preset]);
 
   const [step, setStep] = useState<Step>("tests");
   const [selected, setSelected] = useState<Set<string>>(initialSelected);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [requestId, setRequestId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -65,70 +65,35 @@ export function HomeCollectionWizard() {
     setError(null);
     startTransition(async () => {
       try {
-        const res = await fetch("/api/home-collection", {
+        const res = await fetch("/api/payments/initialize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            tests: selectedTests.map((t) => ({
-              id: t.id,
-              name: t.name,
-              priceNgn: t.priceNgn,
-            })),
-            contact: form,
-            totalNgn: total,
+            serviceIds: selectedTests.map((test) => test.id),
+            purpose: "home-collection",
+            customer: form,
           }),
         });
         const data = (await res.json()) as {
-          ok?: boolean;
-          requestId?: string;
+          authorizationUrl?: string;
           message?: string;
         };
-        if (!res.ok || !data.ok) {
-          setError(data.message || "Could not submit request. Try again.");
+        if (!res.ok || !data.authorizationUrl) {
+          setError(data.message || "Could not start payment. Try again.");
           return;
         }
-        setRequestId(data.requestId ?? null);
-        setStep("done");
-        router.replace("/home-collection?done=1");
+        window.location.href = data.authorizationUrl;
       } catch {
         setError("Network error. Please try again.");
       }
     });
   }
 
-  if (step === "done") {
+  if (eligible.length === 0) {
     return (
-      <div className="mx-auto max-w-xl rounded-sm border border-border bg-surface p-8 text-center">
-        <p className="text-sm font-medium uppercase tracking-wider text-teal-soft">
-          Request received
-        </p>
-        <h2 className="font-display mt-2 text-3xl text-teal-deep">
-          We will prepare your kit
-        </h2>
-        <p className="mt-4 text-muted leading-relaxed">
-          Our team will contact you to confirm delivery of the sample kit and
-          return instructions. Keep your phone nearby.
-        </p>
-        {requestId ? (
-          <p className="mt-4 text-sm text-foreground">
-            Reference: <span className="font-mono font-medium">{requestId}</span>
-          </p>
-        ) : null}
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link
-            href="/services"
-            className="rounded-md bg-teal px-4 py-2.5 text-sm font-semibold text-white"
-          >
-            Browse more tests
-          </Link>
-          <Link
-            href="/"
-            className="rounded-md border border-border px-4 py-2.5 text-sm font-semibold text-teal"
-          >
-            Back home
-          </Link>
-        </div>
-      </div>
+      <p className="text-muted" role="alert">
+        {loadError || "No tests are available to request right now."}
+      </p>
     );
   }
 
@@ -287,6 +252,10 @@ export function HomeCollectionWizard() {
               <dd className="inline">{form.phone}</dd>
             </div>
             <div>
+              <dt className="inline font-medium text-foreground">Email: </dt>
+              <dd className="inline">{form.email}</dd>
+            </div>
+            <div>
               <dt className="inline font-medium text-foreground">Address: </dt>
               <dd className="inline">
                 {form.address}
@@ -295,8 +264,8 @@ export function HomeCollectionWizard() {
             </div>
           </dl>
           <p className="mt-4 text-xs text-muted">
-            Payment and kit dispatch are confirmed by our team after review.
-            Prices are estimates from the current catalogue.
+            You pay the centre fee on the next page. A receipt is emailed when
+            Flutterwave confirms the payment. Prices are the current centre fees.
           </p>
           {error ? (
             <p className="mt-4 text-sm text-red-700" role="alert">
@@ -317,7 +286,7 @@ export function HomeCollectionWizard() {
               onClick={submit}
               className="rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-teal-deep disabled:opacity-50"
             >
-              {pending ? "Submitting…" : "Submit request"}
+              {pending ? "Opening payment…" : "Pay now"}
             </button>
           </div>
         </div>

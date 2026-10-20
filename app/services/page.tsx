@@ -1,9 +1,8 @@
 import { ServicesCatalog } from "@/components/ServicesCatalog";
 import { JsonLd } from "@/components/JsonLd";
 import { CtaButton, PageHero, Section } from "@/components/ui";
-import { categories } from "@/lib/mock-catalog";
 import { breadcrumbNode, pageMeta, seoCopy } from "@/lib/seo";
-import { getTests } from "@/lib/vessel";
+import { getServiceCategories, getServices } from "@/lib/vessel";
 
 export const metadata = pageMeta({
   title: seoCopy.services.title,
@@ -11,8 +10,13 @@ export const metadata = pageMeta({
   path: "/services",
 });
 
+export const dynamic = "force-dynamic";
+
 export default async function ServicesPage() {
-  const tests = await getTests();
+  const [catalog, categories] = await Promise.all([
+    getServices({ skip: 0, take: 10, search: "" }),
+    getServiceCategories(),
+  ]);
 
   return (
     <>
@@ -41,18 +45,22 @@ export default async function ServicesPage() {
       />
 
       <Section>
-        <div className="mb-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((cat) => (
-            <div key={cat.id} className="border-t border-border pt-4">
-              <h2 className="font-display text-xl text-teal-deep">{cat.name}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                {cat.description}
-              </p>
-            </div>
-          ))}
-        </div>
+        {categories.length > 0 ? (
+          <div className="mb-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {categories.map((cat) => (
+              <div key={cat.id} className="border-t border-border pt-4">
+                <h2 className="font-display text-xl text-teal-deep">{cat.name}</h2>
+                {cat.description ? (
+                  <p className="mt-2 text-sm leading-relaxed text-muted">
+                    {cat.description}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
 
-        <ServicesCatalog initialTests={tests} />
+        <ServicesCatalog initial={catalog} categories={categories} />
       </Section>
     </>
   );

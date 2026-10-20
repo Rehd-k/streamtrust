@@ -3,9 +3,10 @@ import { HeroCarousel } from "@/components/HeroCarousel";
 import { SitePhoto } from "@/components/SitePhoto";
 import { CtaButton, Section } from "@/components/ui";
 import { listGalleryPhotos, listHeroSlides } from "@/lib/gallery";
-import { formatNgn, tests } from "@/lib/mock-catalog";
+import { formatNgn } from "@/lib/catalog";
 import { org } from "@/lib/org";
 import { pageMeta, seoCopy } from "@/lib/seo";
+import { getServices } from "@/lib/vessel";
 
 export const metadata = pageMeta({
   title: seoCopy.home.title,
@@ -48,8 +49,10 @@ const diagnosticsCopy: Record<
   },
 };
 
-export default function HomePage() {
-  const popular = tests.filter((t) => t.popular).slice(0, 4);
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const popular = await getServices({ skip: 0, take: 4, search: "" });
   const slides = listHeroSlides();
   const byFile = new Map(
     listGalleryPhotos().map((photo) => [photo.file, photo]),
@@ -127,33 +130,44 @@ export default function HomePage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.14em] text-teal-soft">
-              Popular
+              Prices
             </p>
             <h2 className="font-display mt-2 text-3xl tracking-tight text-foreground">
-              Frequently requested
+              From the catalogue
             </h2>
           </div>
         </div>
-        <ul className="mt-10 divide-y divide-border border-y border-border">
-          {popular.map((test) => (
-            <li key={test.id}>
-              <Link
-                href={`/services/${test.slug}`}
-                className="flex flex-col gap-1 py-5 transition-colors hover:bg-surface-soft/60 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
-              >
-                <div>
-                  <p className="font-medium text-foreground">{test.name}</p>
-                  <p className="mt-1 text-sm text-muted line-clamp-1">
-                    {test.description}
+        {popular.error ? (
+          <p className="mt-10 text-sm text-muted" role="alert">
+            {popular.error}{" "}
+            <Link href="/services" className="font-semibold text-teal hover:underline">
+              Open the price list
+            </Link>
+          </p>
+        ) : (
+          <ul className="mt-10 divide-y divide-border border-y border-border">
+            {popular.services.map((test) => (
+              <li key={test.id}>
+                <Link
+                  href={`/services/${test.id}`}
+                  className="flex flex-col gap-1 py-5 transition-colors hover:bg-surface-soft/60 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+                >
+                  <div>
+                    <p className="font-medium text-foreground">{test.name}</p>
+                    {test.description ? (
+                      <p className="mt-1 line-clamp-1 text-sm text-muted">
+                        {test.description}
+                      </p>
+                    ) : null}
+                  </div>
+                  <p className="shrink-0 text-sm font-semibold text-teal">
+                    {formatNgn(test.priceNgn)}
                   </p>
-                </div>
-                <p className="shrink-0 text-sm font-semibold text-teal">
-                  {formatNgn(test.priceNgn)}
-                </p>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </Section>
 
       <section className="bg-surface">
